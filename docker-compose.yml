@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  app:
+    container_name: portal_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - database_network
+      - app_network
+
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - DATABASE_URL
+
+    depends_on:
+      - database
+
+    env_file:
+      - .env
+
+  database:
+    container_name: portal_database
+    image: postgres:15.1
+    volumes:
+      - ./database_volume:/var/lib/postgresql/data
+    networks:
+      - database_network
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+    ports:
+      # Allow us to directly access the database during development
+      - "5432:5432"
+    env_file:
+      - .env
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: portal_pgadmin4
+    restart: always
+    depends_on:
+      - database
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: test@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    networks:
+      - database_network
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+  nginx:
+    container_name: portal_nginx
+    restart: on-failure
+    image: jonasal/nginx-certbot:latest
+    env_file:
+      - .env.nginx
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - app
+    networks:
+      - app_network
+
+networks:
+  database_network:
+    driver: bridge
+  app_network:
+    driver: bridge
+
+volumes:
+  database_volume:
+  pgadmin-data:
